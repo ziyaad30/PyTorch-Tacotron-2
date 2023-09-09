@@ -163,6 +163,11 @@ def train(args):
                 if args.ckpt_dir != '' and (iteration % hps.iters_per_ckpt == 0):
                     ckpt_pth = os.path.join(args.ckpt_dir, 'ckpt_{}'.format(iteration))
                     save_checkpoint(model, optimizer, iteration, ckpt_pth, hps.iters_per_ckpt, args.ckpt_dir)
+                    
+                    if os.path.exists("/content/drive/MyDrive/"):
+                        inner_bar.write('Saving to Google Drive...')
+                        ckpt_pth = os.path.join("/content/drive/MyDrive/final_ckpt/", 'ckpt_{}'.format(iteration))
+                        save_checkpoint(model, optimizer, iteration, ckpt_pth, hps.iters_per_ckpt, args.ckpt_dir)
 
             iteration += 1
             inner_bar.update(1)
