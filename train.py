@@ -175,7 +175,7 @@ def train(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     # path
-    parser.add_argument('-d', '--data_dir', type = str, default = '/home/ubuntu/hifi-gan/dataset',
+    parser.add_argument('-d', '--data_dir', type = str, default = 'dataset_raw',
                         help = 'directory to load data')
     parser.add_argument('-l', '--log_dir', type = str, default = 'log',
                         help = 'directory to save tensorboard logs')
