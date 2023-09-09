@@ -2,7 +2,7 @@ numpy
 scipy
 pillow
 inflect
-librosa
+librosa==0.8.1
 Unidecode
 matplotlib
 tensorboardX
