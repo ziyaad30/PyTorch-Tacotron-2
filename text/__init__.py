@@ -24,11 +24,11 @@ def phoneme_to_sequence(text, cleaner_names):
     sequence = []
     text = _clean_text(text, cleaner_names)
     
-    print(f'CLEANED: {text}')
+    # print(f'CLEANED: {text}')
     
     text = phoneme_text(text)
     
-    print(f' PHONED: {text}')
+    # print(f' PHONED: {text}')
     
     sequence += _symbols_to_sequence(text)
     
