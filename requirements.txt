@@ -6,3 +6,4 @@ librosa
 Unidecode
 matplotlib
 tensorboardX
+phonemizer
