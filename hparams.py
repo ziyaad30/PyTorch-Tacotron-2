@@ -56,7 +56,7 @@ class hparams:
     encoder_embedding_dim = 512
 
     # Decoder parameters
-    n_frames_per_step = 2
+    n_frames_per_step = 4
     decoder_rnn_dim = 1024
     prenet_dim = 256
     max_decoder_ratio = 10
