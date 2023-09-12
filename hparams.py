@@ -38,7 +38,7 @@ class hparams:
     max_iter = 800e3
     batch_size = 32
     iters_per_log = 100
-    iters_per_sample = 100
+    iters_per_sample = 500
     iters_per_ckpt = 1000
     weight_decay = 1e-6
     grad_clip_thresh = 1.0
