@@ -2,9 +2,9 @@
 Yet another PyTorch implementation of [Natural TTS Synthesis by Conditioning WaveNet on Mel Spectrogram Predictions](https://arxiv.org/pdf/1712.05884.pdf). The project is highly based on [these](#References). I made some modification to improve speed and performance of both training and inference.
 
 ## TODO
-- [] Add Colab demo.
-- [] Update README.
-- [x] Upload pretrained models.
+- [ ] Add Colab demo.
+- [ ] Update README.
+- [ ] Upload pretrained models.
 - [x] Compatible with [WaveGlow](https://github.com/NVIDIA/waveglow) and [Hifi-GAN](https://github.com/jik876/hifi-gan).
 
 ## Requirements
