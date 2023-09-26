@@ -1,9 +1,9 @@
-import os
+import os, glob
 import time
 import torch
 import argparse
 import numpy as np
-from inference import infer
+from inference import infer, hifi_infer
 from utils.util import mode
 from hparams import hparams as hps
 from utils.logger import Tacotron2Logger
@@ -11,7 +11,7 @@ from utils.dataset import ljdataset, ljcollate
 from model.model import Tacotron2, Tacotron2Loss
 from torch.utils.data import DistributedSampler, DataLoader
 from tqdm import tqdm
-from text import phoneme_text
+
 
 np.random.seed(hps.seed)
 torch.manual_seed(hps.seed)
@@ -28,32 +28,43 @@ def prepare_dataloaders(fdir, n_gpu):
     return train_loader
 
 
-def load_checkpoint(ckpt_pth, model, optimizer):
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+def load_checkpoint(ckpt_pth, model, optimizer, device, n_gpu):
     ckpt_dict = torch.load(ckpt_pth, map_location = device)
-    model.load_state_dict(ckpt_dict['model'])
+    (model.module if n_gpu > 1 else model).load_state_dict(ckpt_dict['model'])
     optimizer.load_state_dict(ckpt_dict['optimizer'])
     iteration = ckpt_dict['iteration']
     return model, optimizer, iteration
 
 
-def save_checkpoint(model, optimizer, iteration, ckpt_pth, iters_per_ckpt, ckpt_dir):
-    torch.save({'model': model.state_dict(),
+def save_checkpoint(model, optimizer, iteration, ckpt_pth, n_gpu):
+    torch.save({'model': (model.module if n_gpu > 1 else model).state_dict(),
                 'optimizer': optimizer.state_dict(),
                 'iteration': iteration}, ckpt_pth)
-    
-    clean_checkpoints(iteration, iters_per_ckpt, ckpt_dir)
 
 
-def clean_checkpoints(iteration, iters_per_ckpt, ckpt_dir):
-    if iteration > 0:
-        last_checkpoint = iteration - (iters_per_ckpt * 2)
-        try:
-            os.remove(os.path.join(ckpt_dir, "ckpt_{}".format(last_checkpoint)))
-        except OSError:
-            pass
+def extract_digits(f):
+    digits = "".join(filter(str.isdigit, f))
+    return int(digits) if digits else -1
 
-    
+
+def latest_checkpoint_path(dir_path, regex="ckpt_[0-9]*"):
+    f_list = glob.glob(os.path.join(dir_path, regex))
+    f_list.sort(key=lambda f: int("".join(filter(str.isdigit, f))))
+    x = f_list[-1]
+    print(x)
+    return x
+
+
+def oldest_checkpoint_path(dir_path, regex="ckpt_[0-9]*", preserved=4):
+    f_list = glob.glob(os.path.join(dir_path, regex))
+    f_list.sort(key=lambda f: extract_digits(f))
+    if len(f_list) > preserved:
+        x = f_list[0]
+        # print(f"oldest_checkpoint_path:{x}")
+        return x
+    return ""
+
+
 def train(args):
     # setup env
     rank = local_rank = 0
@@ -81,21 +92,25 @@ def train(args):
     
     # load checkpoint
     iteration = 1
-    if args.ckpt_pth != '':
-        model, optimizer, iteration = load_checkpoint(args.ckpt_pth, model, optimizer)
-        
-        if args.pretrained:
-            iteration = 1
-        else:
-            iteration += 1
+    if args.resume:
+        latest_model = latest_checkpoint_path(args.ckpt_dir)
+        model, optimizer, iteration = load_checkpoint(str(latest_model), model, optimizer, device, n_gpu)
+        iteration += 1
+    
+    if args.pretrained:
+        optimizer = torch.optim.Adam(model.parameters(), lr = hps.lr, betas = hps.betas, eps = hps.eps, weight_decay = hps.weight_decay)
+        lr_lambda = lambda step: hps.sch_step**0.5*min((step+1)*hps.sch_step**-1.5, (step+1)**-0.5)
+        scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda)
+        iteration = 1
     
     # get scheduler
-    if hps.sch:
+    if hps.sch and not args.pretrained:
         lr_lambda = lambda step: hps.sch_step**0.5*min((step+1)*hps.sch_step**-1.5, (step+1)**-0.5)
-        if args.ckpt_pth != '':
+        if args.resume:
             scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda, last_epoch = iteration)
         else:
             scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda)
+
     
     # make dataset
     train_loader = prepare_dataloaders(args.data_dir, n_gpu)
@@ -119,7 +134,7 @@ def train(args):
     while iteration <= hps.max_iter:
         if n_gpu > 1:
             train_loader.sampler.set_epoch(epoch)
-        inner_bar = tqdm(total=len(train_loader), desc="Epoch {}".format(epoch), position=0, leave=True)
+        inner_bar = tqdm(total=len(train_loader), desc="Epoch {}".format(epoch), position=0, leave=False)
         for batch in train_loader:
             if iteration > hps.max_iter:
                 break
@@ -142,32 +157,31 @@ def train(args):
 
             dur = time.perf_counter()-start
             if rank == 0:
+                # log
+                if args.log_dir != '' and (iteration % hps.iters_per_log == 0):
+                    learning_rate = optimizer.param_groups[0]['lr']
+                    inner_bar.write('Iter: {}, Mel Loss: {:.7f}, Gate Loss: {:.7f}, Grad Norm: {:.7f}, lr: {:.5f} {:.1f}s/it'.format(iteration, items[0], items[1], grad_norm, learning_rate, dur))
+                    logger.log_training(items, grad_norm, learning_rate, iteration)
+
                 # sample
                 if args.log_dir != '' and (iteration % hps.iters_per_sample == 0):
                     model.eval()
                     output = infer(hps.eg_text, model.module if n_gpu > 1 else model)
+                    mel_outputs_postnet = hifi_infer(hps.eg_text, model.module if n_gpu > 1 else model)
+                    logger.sample_infer_hifi(mel_outputs_postnet, iteration)
                     model.train()
                     logger.sample_train(y_pred, iteration)
                     logger.sample_infer(output, iteration)
 
-                # info
-                if iteration % hps.iters_per_log == 0:
-                    inner_bar.write('Iter: {}, Mel Loss: {:.6f}, Gate Loss: {:.7f}, Grad Norm: {:.6f}, {:.2f}s/it'.format(iteration, items[0], items[1], grad_norm, dur))
-
-                # log
-                if args.log_dir != '' and (iteration % hps.iters_per_log == 0):
-                    learning_rate = optimizer.param_groups[0]['lr']
-                    logger.log_training(items, grad_norm, learning_rate, iteration)
-
                 # save ckpt
                 if args.ckpt_dir != '' and (iteration % hps.iters_per_ckpt == 0):
                     ckpt_pth = os.path.join(args.ckpt_dir, 'ckpt_{}'.format(iteration))
-                    save_checkpoint(model, optimizer, iteration, ckpt_pth, hps.iters_per_ckpt, args.ckpt_dir)
-                    
-                    if os.path.exists("/content/drive/MyDrive/"):
-                        inner_bar.write('Saving to Google Drive...')
-                        ckpt_pth = os.path.join("/content/drive/MyDrive/final_ckpt/", 'ckpt_{}'.format(iteration))
-                        save_checkpoint(model, optimizer, iteration, ckpt_pth, hps.iters_per_ckpt, "/content/drive/MyDrive/final_ckpt/")
+                    save_checkpoint(model, optimizer, iteration, ckpt_pth, n_gpu)
+                    inner_bar.write(f"Saved {ckpt_pth}")
+                    old_ckpt = oldest_checkpoint_path(args.ckpt_dir, "ckpt_[0-9]*", preserved=2)
+                    if os.path.exists(old_ckpt):
+                        inner_bar.write(f"Remove {old_ckpt}")
+                        os.remove(old_ckpt)
 
             iteration += 1
             inner_bar.update(1)
@@ -180,16 +194,17 @@ def train(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     # path
-    parser.add_argument('-d', '--data_dir', type = str, default = 'dataset_raw',
+    parser.add_argument('-d', '--data_dir', type = str, default = 'dataset',
                         help = 'directory to load data')
     parser.add_argument('-l', '--log_dir', type = str, default = 'log',
                         help = 'directory to save tensorboard logs')
-    parser.add_argument('-cd', '--ckpt_dir', type = str, default = 'ckpt',
+    parser.add_argument('-cd', '--ckpt_dir', type = str, default = 'checkpoints',
                         help = 'directory to save checkpoints')
     parser.add_argument('-cp', '--ckpt_pth', type = str, default = '',
                         help = 'path to load checkpoints')
+    parser.add_argument('-r', '--resume', action='store_true')
     parser.add_argument('-p', '--pretrained', action='store_true')
-
+    
     args = parser.parse_args()
     
     torch.backends.cudnn.enabled = True
