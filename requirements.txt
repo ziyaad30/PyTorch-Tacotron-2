@@ -5,5 +5,5 @@ inflect
 librosa==0.8.1
 Unidecode
 matplotlib
-tensorboardX
-phonemizer
+tensorboard
+tokenizers==0.13.3
