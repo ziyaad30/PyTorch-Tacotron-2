@@ -8,16 +8,15 @@ Yet another PyTorch implementation of [Natural TTS Synthesis by Conditioning Wav
 - [x] Compatible with [WaveGlow](https://github.com/NVIDIA/waveglow) and [Hifi-GAN](https://github.com/jik876/hifi-gan).
 
 ## Requirements
-- Python >= 3.5.2
-- torch >= 1.0.0
 - numpy
 - scipy
 - pillow
 - inflect
-- librosa
+- librosa==0.8.1
 - Unidecode
 - matplotlib
-- tensorboardX
+- tensorboard
+- tokenizers==0.13.3
 
 ## Preprocessing
 Currently only support [LJ Speech](https://keithito.com/LJ-Speech-Dataset/). You can modify `hparams.py` for different sampling rates. `prep` decides whether to preprocess all utterances before training or online preprocess. `pth` sepecifies the path to store preprocessed data.
