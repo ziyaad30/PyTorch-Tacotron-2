@@ -27,7 +27,7 @@ class hparams:
     ################################
     is_cuda = True
     pin_mem = True
-    n_workers = 0
+    n_workers = 4
     prep = True
     pth = 'lj-22k.pkl'
     lr = 2e-3
