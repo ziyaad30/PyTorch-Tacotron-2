@@ -7,7 +7,7 @@ class hparams:
     ################################
     # Data Parameters              #
     ################################
-    text_cleaners=['phoneme_cleaners']
+    text_cleaners=['english_cleaners']
 
     ################################
     # Audio                        #
@@ -27,22 +27,22 @@ class hparams:
     ################################
     is_cuda = True
     pin_mem = True
-    n_workers = 4
+    n_workers = 0
     prep = True
     pth = 'lj-22k.pkl'
-    lr = 2e-3
+    lr = 1e-3
     betas = (0.9, 0.999)
     eps = 1e-6
     sch = True
     sch_step = 4000
-    max_iter = 800e3
-    batch_size = 32
-    iters_per_log = 100
-    iters_per_sample = 500
-    iters_per_ckpt = 1000
+    max_iter = 200e3
+    batch_size = 4
+    iters_per_log = 10
+    iters_per_sample = 100
+    iters_per_ckpt = 200
     weight_decay = 1e-6
     grad_clip_thresh = 1.0
-    eg_text = 'Scientists at the CERN laboratory say they have discovered a new particle.'
+    eg_text = 'Tacotron 2 is really awesome!'
 
     ################################
     # Model Parameters             #
@@ -56,7 +56,7 @@ class hparams:
     encoder_embedding_dim = 512
 
     # Decoder parameters
-    n_frames_per_step = 4
+    n_frames_per_step = 3
     decoder_rnn_dim = 1024
     prenet_dim = 256
     max_decoder_ratio = 10
@@ -76,4 +76,3 @@ class hparams:
     postnet_embedding_dim = 512
     postnet_kernel_size = 5
     postnet_n_convolutions = 5
-
