@@ -3,7 +3,7 @@ import time
 import torch
 import argparse
 import numpy as np
-from inference import infer, hifi_infer
+from inference import infer
 from utils.util import mode
 from hparams import hparams as hps
 from utils.logger import Tacotron2Logger
@@ -167,8 +167,6 @@ def train(args):
                 if args.log_dir != '' and (iteration % hps.iters_per_sample == 0):
                     model.eval()
                     output = infer(hps.eg_text, model.module if n_gpu > 1 else model)
-                    mel_outputs_postnet = hifi_infer(hps.eg_text, model.module if n_gpu > 1 else model)
-                    logger.sample_infer_hifi(mel_outputs_postnet, iteration)
                     model.train()
                     logger.sample_train(y_pred, iteration)
                     logger.sample_infer(output, iteration)
