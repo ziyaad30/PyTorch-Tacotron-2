@@ -3,7 +3,6 @@ import torch
 import pickle
 import numpy as np
 from text import text_to_sequence
-from text import phoneme_to_sequence
 from hparams import hparams as hps
 from torch.utils.data import Dataset
 from utils.audio import load_wav, melspectrogram
@@ -48,7 +47,7 @@ def get_mel_text_pair(text, wav_path):
     return (text, mel)
 
 def get_text(text):
-    return torch.IntTensor(phoneme_to_sequence(text, hps.text_cleaners))
+    return torch.IntTensor(text_to_sequence(text, hps.text_cleaners))
 
 def get_mel(wav_path):
     wav = load_wav(wav_path)
